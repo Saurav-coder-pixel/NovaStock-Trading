@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, Bitcoin } from 'lucide-react';
 import { Stock, ViewType } from '../../types';
 
 interface SidebarProps {
@@ -27,7 +27,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'market', label: 'Market Overview', icon: LineChart },
+    { id: 'market', label: 'Stock Market', icon: LineChart },
+    { id: 'crypto', label: 'Crypto Exchange', icon: Bitcoin },
     { id: 'portfolio', label: 'Portfolio', icon: PieChart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
