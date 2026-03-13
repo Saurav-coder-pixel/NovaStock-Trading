@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -16,6 +16,7 @@
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
               mono: ['JetBrains Mono', 'monospace'],
+              display: ['Syne', 'sans-serif'],
             },
             colors: {
               background: 'rgb(var(--bg-main) / <alpha-value>)', 
@@ -23,8 +24,8 @@
               border: 'rgb(var(--border-color) / <alpha-value>)',
               primary: '#6366f1', // Indigo 500
               accent: '#0ea5e9', // Sky 500
-              success: '#10b981', // Emerald 500
-              danger: '#ef4444', // Red 500
+              success: '#00D084', // Ultra Green
+              danger: '#FF3B5C', // Ultra Red
             }
           }
         }
@@ -58,8 +59,8 @@
       }
       
       .dark {
-        --bg-main: 11 14 20; /* #0B0E14 */
-        --bg-surface: 21 25 33; /* #151921 */
+        --bg-main: 10 11 14; /* #0A0B0E */
+        --bg-surface: 17 19 24; /* #111318 */
         --border-color: 30 41 59; /* Slate 800 */
         --text-main: 248 250 252; /* Slate 50 */
       }
