@@ -211,3 +211,53 @@ export const subscribeToTicker = (symbol: string, callback: Listener) => {
     clearInterval(interval);
   };
 };
+
+export const fetchStockHistory = async (symbol: string, timeframe: string): Promise<Candle[]> => {
+  try {
+    let interval = '1d';
+    let range = '1y';
+    if (timeframe === '1m') { interval = '1m'; range = '1d'; }
+    else if (timeframe === '5m') { interval = '5m'; range = '5d'; }
+    else if (timeframe === '15m') { interval = '15m'; range = '5d'; }
+    else if (timeframe === '1H') { interval = '1h'; range = '1mo'; }
+    else if (timeframe === '4H') { interval = '1h'; range = '3mo'; }
+    else if (timeframe === '1D') { interval = '1d'; range = '1y'; }
+    else if (timeframe === '1W') { interval = '1wk'; range = '2y'; }
+
+    // Use a CORS proxy
+    const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
+    const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Yahoo Finance API returned ${response.status}`);
+    const data = await response.json();
+    
+    const result = data.chart.result[0];
+    const timestamps = result.timestamp;
+    const quote = result.indicators.quote[0];
+    
+    if (!timestamps || !quote) throw new Error('Invalid data model');
+    
+    const candles: Candle[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+        if (quote.open[i] === null || quote.close[i] === null) continue;
+        
+        candles.push({
+            time: new Date(timestamps[i] * 1000).toISOString(),
+            open: quote.open[i],
+            high: quote.high[i],
+            low: quote.low[i],
+            close: quote.close[i],
+            volume: quote.volume[i] || 0,
+            isPrediction: false
+        });
+    }
+    
+    if (candles.length === 0) throw new Error('No valid candles parsed');
+    return candles;
+  } catch (err) {
+    console.warn('Yahoo Finance fetch failed, using mock generator.', err);
+    // fallback to mock generator
+    return generateHistory(symbol, timeframe as TimeFrame || TimeFrame.D1);
+  }
+};

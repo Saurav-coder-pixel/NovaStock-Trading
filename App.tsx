@@ -78,6 +78,7 @@ const App: React.FC = () => {
             isChatOpen={isChatOpen} 
             onToggleChat={() => setIsChatOpen(!isChatOpen)}
             isDarkMode={theme === 'dark'} 
+            onSelectStock={handleStockSelect}
           />
         );
       case 'portfolio':

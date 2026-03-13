@@ -1,52 +1,44 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Activity, BarChart3, TrendingUp, AlertCircle, Layers, Check, SlidersHorizontal } from 'lucide-react';
-import StockHeader from '../Dashboard/StockHeader';
-import MarketChart from '../Charts/MarketChart';
-import IntegratedAI from './IntegratedAI';
-import { generateHistory, WATCHLIST } from '../../services/stockService';
-import { Stock, Candle, TimeFrame, PredictionResult } from '../../types';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { ArrowUpRight } from 'lucide-react';
+import { WATCHLIST, fetchStockHistory } from '../../services/stockService';
+import { getAnthropicAnalysis, AIAnalysisResult } from '../../services/anthropicService';
+import { Stock, Candle } from '../../types';
+
+import TerminalLayout from '../Layout/TerminalLayout';
+import TickerTape, { TickerItem } from '../Terminal/TickerTape';
+import AssetList, { AssetItem } from '../Terminal/AssetList';
+import LightweightChart from '../Terminal/LightweightChart';
+import PerformanceChart from '../Terminal/PerformanceChart';
+import OrderBook, { OrderLevel } from '../Terminal/OrderBook';
+import OrderPanel from '../Terminal/OrderPanel';
+import AIPanel from '../Terminal/AIPanel';
 
 interface MarketOverviewProps {
   currentStock: Stock;
-  isChatOpen: boolean;
-  onToggleChat: () => void;
+  isChatOpen: boolean; 
+  onToggleChat: () => void; 
   isDarkMode?: boolean;
+  onSelectStock?: (stock: Stock) => void;
 }
 
-const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isChatOpen, onToggleChat, isDarkMode = true }) => {
-  const [timeframe, setTimeframe] = useState<TimeFrame>(TimeFrame.D1);
+const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isDarkMode = true, onSelectStock }) => {
   const [history, setHistory] = useState<Candle[]>([]);
-  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [timeframe, setTimeframe] = useState<string>('1D');
   
-  // Comparison State
-  const [selectedComparisons, setSelectedComparisons] = useState<string[]>([]);
-  const [comparisonData, setComparisonData] = useState<Record<string, Candle[]>>({});
-  const [isCompareMenuOpen, setIsCompareMenuOpen] = useState(false);
-
-  // Indicator State
-  const [indicators, setIndicators] = useState({
-    ma: true,
-    rsi: false,
-    macd: false
-  });
+  // AI State
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   // Initialize Data when stock or timeframe changes
   useEffect(() => {
-    const data = generateHistory(currentStock.symbol, timeframe);
-    setHistory(data);
-    setPrediction(null);
-    setSelectedComparisons([]); 
-    setComparisonData({});
-  }, [currentStock.symbol, timeframe]);
-
-  // Fetch data for selected comparisons
-  useEffect(() => {
-    const newComparisonData: Record<string, Candle[]> = {};
-    selectedComparisons.forEach(symbol => {
-      newComparisonData[symbol] = generateHistory(symbol, timeframe);
+    fetchStockHistory(currentStock.symbol, timeframe).then(data => {
+      setHistory(data);
+      if (timeframe === '1D') {
+         setAiAnalysis(null); // only reset AI organically if viewing 1D
+      }
     });
-    setComparisonData(newComparisonData);
-  }, [selectedComparisons, timeframe]);
+  }, [currentStock.symbol, timeframe]);
 
   // Update history when currentStock price changes (live update simulation)
   useEffect(() => {
@@ -66,194 +58,233 @@ const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isChatOpe
         low: Math.min(lastReal.low, currentStock.price) 
       };
       
-      const predictions = prev.filter(c => c.isPrediction);
-      return [...realHistory.slice(0, -1), newCandle, ...predictions];
+      return [...realHistory.slice(0, -1), newCandle];
     });
   }, [currentStock.price]);
 
-  const handlePredictionUpdate = (result: PredictionResult | null) => {
-    if (result) {
-        setPrediction(result);
-        if (result.predictedPath && result.predictedPath.length > 0) {
-            const cleanHistory = history.filter(c => !c.isPrediction);
-            const lastCandle = cleanHistory[cleanHistory.length - 1];
-            const lastTime = new Date(lastCandle.time);
-            
-            // Determine time interval
-            const prevCandle = cleanHistory[cleanHistory.length - 2];
-            const intervalMs = prevCandle ? lastTime.getTime() - new Date(prevCandle.time).getTime() : 24 * 60 * 60 * 1000;
+  // Derived Props for Terminal
+  const tickerItems: TickerItem[] = WATCHLIST.map(s => ({
+     symbol: s.symbol,
+     price: s.price,
+     change: s.change
+  }));
 
-            const predictedCandles: Candle[] = result.predictedPath.map((price: number, index: number) => {
-                const newTime = new Date(lastTime.getTime() + (intervalMs * (index + 1)));
-                return {
-                    time: newTime.toISOString(),
-                    open: price, 
-                    close: price,
-                    high: price, 
-                    low: price, 
-                    volume: 0,
-                    isPrediction: true
-                };
-            });
-            
-            setHistory(prev => [...prev.filter(c => !c.isPrediction), ...predictedCandles]);
-        }
-    } else {
-        setPrediction(null);
-    }
+  const assetItems: AssetItem[] = WATCHLIST.map(s => {
+     // Generate synthetic sparkline
+     const syntheticSparkline = Array.from({length: 20}, (_, i) => 
+        s.price * (1 + (Math.sin(i) * 0.02) + (Math.random() * 0.01 - 0.005))
+     );
+     
+     return {
+       id: s.symbol,
+       symbol: s.symbol,
+       name: s.name,
+       price: s.price,
+       changePercent: s.change,
+       volume: (s.volume / 1000000).toFixed(1) + 'M',
+       sparkline: syntheticSparkline
+     };
+  });
+
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadSession = async () => {
+       try {
+         const [aapl, nvda, tsla] = await Promise.all([
+           fetchStockHistory('AAPL', '1H'),
+           fetchStockHistory('NVDA', '1H'),
+           fetchStockHistory('TSLA', '1H')
+         ]);
+         if (!mounted) return;
+         
+         const merged: any[] = [];
+         const limit = 24;
+         const aSlice = aapl.slice(-limit);
+         const nSlice = nvda.slice(-limit);
+         const tSlice = tsla.slice(-limit);
+
+         if (aSlice.length > 0) {
+            const baseA = aSlice[0].close;
+            const baseN = nSlice[0]?.close || baseA;
+            const baseT = tSlice[0]?.close || baseA;
+
+            for (let i = 0; i < aSlice.length; i++) {
+               merged.push({
+                 time: aSlice[i].time,
+                 'AAPL': ((aSlice[i].close - baseA) / baseA) * 100,
+                 'NVDA': nSlice[i] ? ((nSlice[i].close - baseN) / baseN) * 100 : 0,
+                 'TSLA': tSlice[i] ? ((tSlice[i].close - baseT) / baseT) * 100 : 0,
+                 _baseA: baseA,
+                 _baseN: baseN,
+                 _baseT: baseT
+               });
+            }
+         }
+         setPerformanceData(merged);
+       } catch (error) {
+          console.error("Failed to load perf history");
+       }
+    };
+    loadSession();
+
+    const interval = setInterval(() => {
+       setPerformanceData(prev => {
+          if (prev.length === 0) return prev;
+          
+          const currentA = WATCHLIST.find(c => c.symbol === 'AAPL')?.price;
+          const currentN = WATCHLIST.find(c => c.symbol === 'NVDA')?.price;
+          const currentT = WATCHLIST.find(c => c.symbol === 'TSLA')?.price;
+          
+          if (!currentA || !currentN || !currentT) return prev;
+          
+          const lastPoint = prev[prev.length - 1];
+          
+          const newPoint = {
+             time: new Date().toISOString(),
+             'AAPL': ((currentA - lastPoint._baseA) / lastPoint._baseA) * 100,
+             'NVDA': ((currentN - lastPoint._baseN) / lastPoint._baseN) * 100,
+             'TSLA': ((currentT - lastPoint._baseT) / lastPoint._baseT) * 100,
+             _baseA: lastPoint._baseA,
+             _baseN: lastPoint._baseN,
+             _baseT: lastPoint._baseT
+          };
+          
+          return [...prev, newPoint];
+       });
+    }, 15000);
+
+    return () => {
+       mounted = false;
+       clearInterval(interval);
+    };
+  }, []);
+
+  const handleGenerateAI = async () => {
+     if (history.length === 0) return;
+     setIsAiLoading(true);
+
+     const closes = history.map(h => h.close);
+     const volumes = history.map(h => h.volume);
+     
+     const ma7 = closes.slice(-7).reduce((a,b)=>a+b,0)/7 || currentStock.price;
+     const ma30 = closes.reduce((a,b)=>a+b,0)/closes.length || currentStock.price;
+     const momentum = closes[closes.length-1] > closes[closes.length-2] ? 5.5 : -2.2; 
+
+     const result = await getAnthropicAnalysis(
+        currentStock.name,
+        currentStock.symbol,
+        currentStock.price,
+        currentStock.change,
+        ma7,
+        ma30,
+        momentum,
+        closes,
+        volumes
+     );
+     
+     setAiAnalysis(result);
+     setIsAiLoading(false);
   };
 
-  const toggleComparison = (symbol: string) => {
-    setSelectedComparisons(prev => 
-      prev.includes(symbol) 
-        ? prev.filter(s => s !== symbol)
-        : [...prev, symbol]
-    );
-  };
+  // Generate mock order book based on current price
+  const mockOrderBook = useMemo(() => {
+      const price = currentStock.price;
+      const spread = price * 0.0005;
+      
+      const asks: OrderLevel[] = Array.from({length: 15}).map((_, i) => [
+          (price + spread + (i * price * 0.001)).toFixed(2),
+          ((Math.random() * 50) + 10).toFixed(2)
+      ]);
+      const bids: OrderLevel[] = Array.from({length: 15}).map((_, i) => [
+          (price - spread - (i * price * 0.001)).toFixed(2),
+          ((Math.random() * 50) + 10).toFixed(2)
+      ]);
 
-  const toggleIndicator = (key: keyof typeof indicators) => {
-    setIndicators(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // Merge Data for Chart
-  const mergedChartData = useMemo(() => {
-    return history.map((candle, index) => {
-      const mergedPoint: any = { ...candle };
-      selectedComparisons.forEach(symbol => {
-        const compCandles = comparisonData[symbol];
-        if (compCandles && compCandles[index]) {
-          mergedPoint[symbol] = compCandles[index].close;
-        }
-      });
-      return mergedPoint;
-    });
-  }, [history, comparisonData, selectedComparisons]);
+      return { asks, bids };
+  }, [currentStock.price]);
 
   return (
-    <div className="animate-fade-in pb-10">
-      <StockHeader 
-        stock={currentStock} 
-        timeframe={timeframe} 
-        setTimeframe={setTimeframe} 
-        onRunPrediction={onToggleChat}
-        isPredicting={false}
-        onToggleChat={onToggleChat}
-        isChatOpen={isChatOpen}
-      />
-
-      {/* Main Chart Card */}
-      <div className="glass-panel rounded-2xl p-1 shadow-xl mb-6 lg:mb-8 relative group bg-surface">
-          
-          {/* Chart Controls Overlay */}
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-             {/* Indicator Toggles */}
-             {!isChatOpen && (
-                 <div className="flex bg-white/80 dark:bg-[#0B0E14]/80 backdrop-blur border border-border rounded-lg p-0.5 animate-in fade-in">
-                    <button 
-                      onClick={() => toggleIndicator('ma')}
-                      className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${indicators.ma ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-                    >
-                      MA
-                    </button>
-                    <button 
-                      onClick={() => toggleIndicator('rsi')}
-                      className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${indicators.rsi ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-                    >
-                      RSI
-                    </button>
-                    <button 
-                      onClick={() => toggleIndicator('macd')}
-                      className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${indicators.macd ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-                    >
-                      MACD
-                    </button>
-                 </div>
-             )}
-
-             {/* Compare Menu */}
-             {!isChatOpen && (
-                 <div className="relative animate-in fade-in">
-                    <button 
-                      onClick={() => setIsCompareMenuOpen(!isCompareMenuOpen)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                        selectedComparisons.length > 0
-                          ? 'bg-indigo-600 text-white border-indigo-500' 
-                          : 'bg-white/80 dark:bg-[#0B0E14]/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <Layers size={14} />
-                      <span>Compare {selectedComparisons.length > 0 && `(${selectedComparisons.length})`}</span>
-                    </button>
-
-                    {isCompareMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setIsCompareMenuOpen(false)}></div>
-                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] border border-border rounded-xl shadow-xl z-20 py-1 animate-in fade-in zoom-in-95 duration-100">
-                           <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-border">
-                             Overlay Stock
-                           </div>
-                           {WATCHLIST.filter(s => s.symbol !== currentStock.symbol).map(stock => (
-                             <button
-                               key={stock.symbol}
-                               onClick={() => toggleComparison(stock.symbol)}
-                               className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                             >
-                               <span className="text-slate-700 dark:text-slate-200">{stock.symbol}</span>
-                               {selectedComparisons.includes(stock.symbol) && (
-                                 <Check size={14} className="text-indigo-500" />
-                               )}
-                             </button>
-                           ))}
-                        </div>
-                      </>
-                    )}
-                 </div>
-             )}
+    <div className="h-[calc(100vh-2rem)] -m-4 md:-m-6 lg:-m-10">
+      <TerminalLayout 
+        tickerText={<TickerTape items={tickerItems} />}
+        headerControls={
+          <div className="flex items-center gap-3 w-full pl-4">
+             <ArrowUpRight className="text-primary w-5 h-5" />
+             <span className="font-bold text-slate-100 uppercase tracking-widest text-sm">Alta MI</span>
+             <span className="text-slate-500 mx-2">|</span>
+             <span className="font-mono text-xs text-slate-400">Equities & Options Desk</span>
           </div>
-
-          {/* Integrated AI Chat Panel */}
-          <IntegratedAI 
-            stock={currentStock}
-            history={history}
-            isOpen={isChatOpen}
-            onClose={onToggleChat}
-            onPredictionUpdate={handlePredictionUpdate}
-            currentPrediction={prediction}
+        }
+        leftPanel={
+          <AssetList 
+            assets={assetItems} 
+            selectedId={currentStock.symbol} 
+            onSelect={(id) => {
+               const stock = WATCHLIST.find(s => s.symbol === id);
+               if (stock && onSelectStock) onSelectStock(stock);
+            }}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
-
-          {/* Responsive Height Container */}
-          <div className="h-[500px] w-full rounded-xl overflow-hidden bg-white/50 dark:bg-[#11141d]/50 flex flex-col">
-            <MarketChart 
-              data={mergedChartData} 
-              symbol={currentStock.symbol} 
-              isDarkMode={isDarkMode} 
-              comparisons={selectedComparisons}
-              indicators={indicators}
-              predictionConfidence={prediction?.confidence}
-              predictionRisk={prediction?.riskLevel}
-            />
+        }
+        mainChart={
+          <>
+            <div className="h-[200px] shrink-0">
+               <PerformanceChart 
+                 data={performanceData} 
+                 assets={[currentStock.symbol, 'SPY', 'QQQ']} 
+                 colors={['#0ea5e9', '#ec4899', '#f59e0b']} 
+               />
+            </div>
+            <div className="flex-1 min-h-0 bg-[#0A0B0E] flex flex-col border-t border-[#1E293B]">
+               <div className="flex bg-[#0A0B0E] p-2 gap-2 border-b border-[#1E293B] items-center">
+                  <span className="text-slate-400 text-xs font-bold px-2">{currentStock.symbol}</span>
+                  <div className="flex gap-1">
+                     {['1m', '5m', '15m', '1H', '4H', '1D', '1W'].map(tf => (
+                       <button 
+                          key={tf}
+                          onClick={() => setTimeframe(tf)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${timeframe === tf ? 'bg-success/20 text-success border border-success/50' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+                       >
+                          {tf}
+                       </button>
+                     ))}
+                  </div>
+               </div>
+               <div className="flex-1 min-h-0 relative">
+                 {history.length > 0 && (
+                    <LightweightChart data={history} symbol={currentStock.symbol} />
+                 )}
+               </div>
+            </div>
+          </>
+        }
+        bottomPanel={
+           <AIPanel 
+             analysis={aiAnalysis} 
+             isLoading={isAiLoading} 
+             onRefresh={handleGenerateAI} 
+           />
+        }
+        rightPanel={
+          <div className="flex flex-col h-full">
+             <div className="flex-[0.6] overflow-hidden">
+               <OrderBook 
+                 bids={mockOrderBook.bids} 
+                 asks={mockOrderBook.asks} 
+                 currentPrice={currentStock.price} 
+               />
+             </div>
+             <div className="flex-[0.4] shrink-0">
+               <OrderPanel symbol={currentStock.symbol} currentPrice={currentStock.price} />
+             </div>
           </div>
-      </div>
-      
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          <StatCard label="Market Cap" value="2.42T" icon={<Activity size={18} className="text-indigo-500 dark:text-indigo-400" />} />
-          <StatCard label="Volume (24h)" value="45.2M" icon={<BarChart3 size={18} className="text-emerald-500 dark:text-emerald-400" />} />
-          <StatCard label="P/E Ratio" value="28.5" icon={<TrendingUp size={18} className="text-sky-500 dark:text-sky-400" />} />
-          <StatCard label="Beta (5Y)" value="1.24" icon={<AlertCircle size={18} className="text-amber-500 dark:text-amber-400" />} />
-      </div>
+        }
+      />
     </div>
   );
 };
-
-const StatCard = ({ label, value, icon }: { label: string, value: string, icon: React.ReactNode }) => (
-    <div className="bg-surface p-4 lg:p-5 rounded-xl border border-border hover:border-slate-300 dark:hover:border-slate-700 transition-colors group shadow-sm">
-        <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-500 text-[10px] lg:text-xs font-bold uppercase tracking-wider">{label}</span>
-            <div className="opacity-50 group-hover:opacity-100 transition-opacity p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">{icon}</div>
-        </div>
-        <div className="text-xl lg:text-2xl font-bold text-slate-900 dark:text-white font-mono tracking-tight">{value}</div>
-    </div>
-);
 
 export default MarketOverview;
