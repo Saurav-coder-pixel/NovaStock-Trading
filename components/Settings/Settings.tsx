@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, Bell, Shield, CreditCard, Moon, Globe, LogOut, 
   Layout, Database, Check, AlertTriangle, Smartphone, Mail, 
-  Zap, Monitor, Grid, BarChart2, Server, Wifi
+  Zap, Monitor, Grid, BarChart2, Server, Wifi, Bot, Eye, EyeOff,
+  Settings as SettingsIcon
 } from 'lucide-react';
+import { AIProvider, AIProviderConfig } from '../../types';
+import { DEFAULT_CONFIGS, PROVIDER_MODELS, sendMessage } from '../../services/aiProviderService';
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -29,6 +32,8 @@ const Settings: React.FC = () => {
         return <AppearanceSettings prefs={chartPrefs} setPrefs={setChartPrefs} />;
       case 'notifications':
         return <NotificationSettings prefs={notifications} setPrefs={setNotifications} />;
+      case 'ai':
+        return <AIAssistantSettings />;
       case 'api':
         return <APISettings />;
       default:
@@ -40,6 +45,7 @@ const Settings: React.FC = () => {
     { id: 'general', label: 'General Profile', icon: User },
     { id: 'appearance', label: 'Appearance & Charts', icon: Layout },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'ai', label: 'AI Assistant', icon: Bot },
     { id: 'api', label: 'API & Data', icon: Database },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'billing', label: 'Billing & Plans', icon: CreditCard },
@@ -355,6 +361,238 @@ const APISettings = () => (
     </div>
   </div>
 );
+
+const AIAssistantSettings = () => {
+  const [aiConfig, setAiConfig] = useState<AIProviderConfig>({
+    provider: 'gemini',
+    apiKey: '',
+    model: 'gemini-2.0-flash-exp',
+    isCustom: false
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  // Load saved config on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('novastock_ai_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setAiConfig(parsed);
+      } catch (error) {
+        console.error('Failed to parse saved AI config:', error);
+      }
+    }
+  }, []);
+
+  const handleProviderChange = (provider: AIProvider) => {
+    const defaultConfig = DEFAULT_CONFIGS[provider];
+    setAiConfig(prev => ({
+      ...prev,
+      provider,
+      model: defaultConfig.model,
+      apiKey: provider === 'gemini' ? '' : prev.apiKey, // Clear API key for Gemini (uses env)
+      isCustom: provider !== 'gemini'
+    }));
+    setTestResult(null);
+  };
+
+  const handleSave = () => {
+    localStorage.setItem('novastock_ai_config', JSON.stringify(aiConfig));
+    setTestResult('Configuration saved successfully!');
+    setTimeout(() => setTestResult(null), 3000);
+  };
+
+  const handleReset = () => {
+    localStorage.removeItem('novastock_ai_config');
+    setAiConfig({
+      provider: 'gemini',
+      apiKey: '',
+      model: 'gemini-2.0-flash-exp',
+      isCustom: false
+    });
+    setTestResult('Reset to default Gemini configuration.');
+    setTimeout(() => setTestResult(null), 3000);
+  };
+
+  const testConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+
+    try {
+      const testMessage = [{ role: 'user' as const, content: 'Hello, can you confirm this connection is working?' }];
+      const response = await sendMessage(aiConfig, testMessage);
+      setTestResult('✅ Connection successful! AI responded.');
+    } catch (error) {
+      if (error instanceof Error && error.message === 'INVALID_API_KEY') {
+        setTestResult('❌ Invalid API key. Please check your credentials.');
+      } else {
+        setTestResult('❌ Connection failed. Please check your settings.');
+      }
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const getProviderInfo = (provider: AIProvider) => {
+    switch (provider) {
+      case 'gemini':
+        return { name: 'Google Gemini', color: 'text-blue-500', bgColor: 'bg-blue-500', description: 'Powered by Google\'s Gemini models' };
+      case 'openai':
+        return { name: 'OpenAI', color: 'text-green-500', bgColor: 'bg-green-500', description: 'Powered by GPT models' };
+      case 'anthropic':
+        return { name: 'Anthropic Claude', color: 'text-purple-500', bgColor: 'bg-purple-500', description: 'Powered by Claude models' };
+    }
+  };
+
+  const providerInfo = getProviderInfo(aiConfig.provider);
+  const isActive = aiConfig.provider === 'gemini' || (aiConfig.isCustom && aiConfig.apiKey.trim());
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+          <Bot size={20} className="text-indigo-500 dark:text-indigo-400" /> AI Assistant Configuration
+        </h3>
+
+        {/* Provider Selection */}
+        <div className="mb-8">
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 block">Choose AI Provider</label>
+          <div className="space-y-3">
+            {(['gemini', 'openai', 'anthropic'] as AIProvider[]).map((provider) => {
+              const info = getProviderInfo(provider);
+              const isSelected = aiConfig.provider === provider;
+              return (
+                <button
+                  key={provider}
+                  onClick={() => handleProviderChange(provider)}
+                  className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                    isSelected
+                      ? 'border-indigo-500 bg-indigo-500/10'
+                      : 'border-border bg-slate-50 dark:bg-[#0B0E14] hover:border-slate-400 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full ${info.bgColor} flex items-center justify-center`}>
+                        {isSelected && <Check size={12} className="text-white" />}
+                      </div>
+                      <div>
+                        <p className={`font-bold ${isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {info.name}
+                        </p>
+                        <p className="text-xs text-slate-500">{info.description}</p>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <div className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Active</span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* API Key Input (for non-Gemini providers) */}
+        {aiConfig.provider !== 'gemini' && (
+          <div className="mb-8">
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">
+              API Key
+              {!aiConfig.apiKey.trim() && (
+                <span className="text-amber-500 ml-2 text-xs">Required for {providerInfo.name}</span>
+              )}
+            </label>
+            <div className="relative">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={aiConfig.apiKey}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                placeholder={`Enter your ${providerInfo.name} API key`}
+                className="w-full bg-slate-50 dark:bg-[#0B0E14] border border-border rounded-xl px-4 py-3 pr-12 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Your API key is stored locally and never transmitted to our servers.
+            </p>
+          </div>
+        )}
+
+        {/* Model Selection */}
+        <div className="mb-8">
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">Model</label>
+          <select
+            value={aiConfig.model}
+            onChange={(e) => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+            className="w-full bg-slate-50 dark:bg-[#0B0E14] border border-border rounded-xl px-4 py-3 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+          >
+            {PROVIDER_MODELS[aiConfig.provider].map((model) => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={handleSave}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-indigo-500/20"
+          >
+            Save & Apply
+          </button>
+          <button
+            onClick={testConnection}
+            disabled={!isActive || isTesting}
+            className="bg-slate-600 hover:bg-slate-500 disabled:bg-slate-400 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors"
+          >
+            {isTesting ? 'Testing...' : 'Test Connection'}
+          </button>
+          <button
+            onClick={handleReset}
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-6 py-2.5 rounded-lg text-sm font-bold transition-colors border border-border"
+          >
+            Reset to Default
+          </button>
+        </div>
+
+        {/* Status Messages */}
+        {testResult && (
+          <div className={`p-4 rounded-xl border ${
+            testResult.includes('✅')
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+              : testResult.includes('❌')
+              ? 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-rose-300'
+              : 'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-300'
+          }`}>
+            <p className="text-sm font-medium">{testResult}</p>
+          </div>
+        )}
+
+        {/* Info Box */}
+        <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-3">
+          <SettingsIcon size={18} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-1">AI Provider Settings</h4>
+            <p className="text-xs text-indigo-600/70 dark:text-indigo-200/60 leading-relaxed">
+              Choose your preferred AI provider for the trading assistant. Gemini is the default and requires no setup.
+              OpenAI and Anthropic require valid API keys which are stored locally in your browser.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ToggleRow = ({ label, description, active, onChange, icon, transparent = false }: any) => (
   <div className={`flex items-center justify-between p-4 ${transparent ? '' : 'bg-slate-50 dark:bg-[#0B0E14] border border-border rounded-xl'}`}>

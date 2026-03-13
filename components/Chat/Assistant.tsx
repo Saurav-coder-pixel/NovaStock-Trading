@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, X, Minimize2 } from 'lucide-react';
-import { ChatMessage, Stock } from '../../types';
-import { getGeminiChatResponse } from '../../services/geminiService';
+import { ChatMessage, Stock, AIProviderConfig } from '../../types';
+import { sendMessage } from '../../services/aiProviderService';
 
 interface AssistantProps {
   currentStock: Stock;
@@ -20,6 +20,12 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [aiConfig, setAiConfig] = useState<AIProviderConfig>({
+    provider: 'gemini',
+    apiKey: '',
+    model: 'gemini-2.0-flash-exp',
+    isCustom: false
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -29,6 +35,26 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isOpen]);
+
+  // Load AI config from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('novastock_ai_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as AIProviderConfig;
+        setAiConfig(parsed);
+      } catch (error) {
+        console.error('Failed to parse saved AI config:', error);
+        // Fall back to default Gemini config
+        setAiConfig({
+          provider: 'gemini',
+          apiKey: '',
+          model: 'gemini-2.0-flash-exp',
+          isCustom: false
+        });
+      }
+    }
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -45,8 +71,14 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
     setIsLoading(true);
 
     try {
-      const responseText = await getGeminiChatResponse(input, currentStock);
-      
+      // Convert messages to the format expected by sendMessage
+      const chatMessages = messages.concat(userMsg).map(msg => ({
+        role: msg.role === 'model' ? 'assistant' : msg.role,
+        content: msg.text
+      }));
+
+      const responseText = await sendMessage(aiConfig, chatMessages);
+
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -55,7 +87,21 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
-        console.error(error);
+      console.error('AI API Error:', error);
+
+      let errorMessage = "I'm having trouble connecting to the AI service right now. Please try again later.";
+
+      if (error instanceof Error && error.message === 'INVALID_API_KEY') {
+        errorMessage = "Invalid API key. Please check your AI Assistant settings and ensure your API key is correct.";
+      }
+
+      const errorMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
+        text: errorMessage,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +125,9 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
             <Sparkles className="text-white w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">Nova AI</h2>
+            <h2 className="text-sm font-bold text-white">
+              Nova AI · {aiConfig.provider === 'gemini' ? 'Gemini' : aiConfig.provider === 'openai' ? 'GPT' : 'Claude'}
+            </h2>
             <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <p className="text-[10px] text-slate-400 font-medium">Financial Analyst Active</p>
