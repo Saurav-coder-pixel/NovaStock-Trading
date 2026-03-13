@@ -51,10 +51,30 @@ export interface PredictionResult {
   predictedPath?: number[];
 }
 
-export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings';
+export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings' | 'crypto';
 
 export interface Holding {
   symbol: string;
   quantity: number;
   avgCost: number;
+}
+
+export interface CryptoCoin {
+  id: string;
+  symbol: string;
+  name: string;
+  image: string;
+  price: number;
+  change24h: number;
+  marketCap: number;
+  volume24h: number;
+  sparkline: number[];
+}
+
+export interface CryptoStats {
+  id: string;
+  price: number;
+  change24h: number;
+  marketCap: number;
+  volume24h: number;
 }

@@ -274,9 +274,11 @@ const MarketChart: React.FC<MarketChartProps> = ({
                <ReferenceArea 
                  x1={predictionStartTime} 
                  x2={predictionEndTime} 
-                 fill={PREDICTION_COLOR} 
-                 fillOpacity={0.08}
-                 strokeOpacity={0}
+                 {...({
+                   fill: PREDICTION_COLOR,
+                   fillOpacity: 0.08,
+                   strokeOpacity: 0,
+                 } as any)}
                />
             )}
 
