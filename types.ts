@@ -58,12 +58,3 @@ export interface Holding {
   quantity: number;
   avgCost: number;
 }
-
-export type AIProvider = 'gemini' | 'openai' | 'anthropic';
-
-export interface AIProviderConfig {
-  provider: AIProvider;
-  apiKey: string;
-  model: string;
-  isCustom: boolean;
-}
