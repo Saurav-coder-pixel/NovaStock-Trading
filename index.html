@@ -80,6 +80,70 @@
         background: rgba(21, 25, 33, 0.7);
         border: 1px solid rgba(255, 255, 255, 0.05);
       }
+
+      /* ── Sidebar Resize Handle ── */
+      .sidebar-root {
+        position: relative;
+      }
+
+      /* Smooth width transition only when NOT dragging */
+      .sidebar-transition {
+        transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                    transform 0.3s ease-in-out;
+      }
+
+      .sidebar-resize-handle {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 5px;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* invisible by default */
+        background: transparent;
+        transition: background 0.2s ease;
+      }
+
+      .sidebar-resize-handle::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 2px;
+        height: 100%;
+        background: transparent;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 2px;
+      }
+
+      .sidebar-resize-handle:hover::after,
+      .sidebar-resize-handle--active::after {
+        background: rgba(99, 102, 241, 0.6); /* indigo glow */
+        box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+      }
+
+      .sidebar-resize-handle--active {
+        background: rgba(99, 102, 241, 0.08);
+      }
+
+      .sidebar-resize-grip {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+        position: relative;
+        z-index: 1;
+      }
+
+      .sidebar-resize-handle:hover .sidebar-resize-grip {
+        opacity: 1;
+      }
     </style>
   <script type="importmap">
 {
