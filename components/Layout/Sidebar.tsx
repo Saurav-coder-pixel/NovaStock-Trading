@@ -1,6 +1,10 @@
-import React from 'react';
-import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, Bitcoin } from 'lucide-react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, Bitcoin, GripVertical } from 'lucide-react';
 import { Stock, ViewType } from '../../types';
+
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 420;
+const DEFAULT_WIDTH = 256; // w-64 = 16rem = 256px
 
 interface SidebarProps {
   watchlist: Stock[];
@@ -12,6 +16,7 @@ interface SidebarProps {
   onClose?: () => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  onWidthChange?: (width: number) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -23,8 +28,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen = false,
   onClose,
   isDarkMode,
-  toggleTheme
+  toggleTheme,
+  onWidthChange,
 }) => {
+  const [sidebarWidth, setSidebarWidth] = useState<number>(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef<number>(0);
+  const startWidthRef = useRef<number>(DEFAULT_WIDTH);
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'market', label: 'Stock Market', icon: LineChart },
@@ -44,24 +56,69 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (onClose) onClose();
   };
 
+  // ── Resize Logic ──────────────────────────────────────────────────
+  const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    startXRef.current = e.clientX;
+    startWidthRef.current = sidebarWidth;
+    setIsResizing(true);
+  }, [sidebarWidth]);
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    const delta = e.clientX - startXRef.current;
+    const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
+    setSidebarWidth(newWidth);
+    onWidthChange?.(newWidth);
+  }, [isResizing, onWidthChange]);
+
+  const onMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      // Prevent text selection during drag
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    } else {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing, onMouseMove, onMouseUp]);
+
+  // Notify parent of default width on mount
+  useEffect(() => {
+    onWidthChange?.(DEFAULT_WIDTH);
+  }, []);
+  // ──────────────────────────────────────────────────────────────────
+
   return (
     <>
       <div 
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        ref={sidebarRef}
+        style={{ width: `${sidebarWidth}px`, minWidth: `${MIN_WIDTH}px`, maxWidth: `${MAX_WIDTH}px` }}
+        className={`fixed inset-y-0 left-0 z-50 bg-surface border-r border-border flex flex-col h-full shadow-2xl lg:relative lg:translate-x-0 ${
+          isResizing ? '' : 'sidebar-transition'
+        } ${isOpen ? 'translate-x-0' : '-translate-x-full'} sidebar-root`}
       >
         {/* Brand */}
-        <div className="p-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <div className="p-6 flex items-center justify-between" style={{ minWidth: 0 }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 flex-shrink-0 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Layers className="text-white w-5 h-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">NovaTrade</span>
+            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">NovaTrade</span>
           </div>
           <button 
             onClick={onClose} 
-            className="lg:hidden text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-1"
+            className="lg:hidden flex-shrink-0 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-1"
           >
             <X size={20} />
           </button>
@@ -81,8 +138,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
                 }`}
               >
-                <item.icon size={18} className={currentView === item.id ? 'text-indigo-600 dark:text-indigo-400' : 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors'} /> 
-                <span className="text-sm font-medium">{item.label}</span>
+                <item.icon size={18} className={`flex-shrink-0 ${currentView === item.id ? 'text-indigo-600 dark:text-indigo-400' : 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors'}`} /> 
+                <span className="text-sm font-medium truncate">{item.label}</span>
               </button>
             ))}
           </nav>
@@ -109,15 +166,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                     : 'hover:bg-slate-100 dark:hover:bg-white/5 border-transparent'
                 }`}
               >
-                <div className="text-left">
+                <div className="text-left min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`font-bold font-mono ${currentStock.symbol === stock.symbol && currentView === 'market' ? 'text-indigo-600 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
                       {stock.symbol}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate w-24">{stock.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate max-w-[7rem]">{stock.name}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <div className="text-sm font-medium text-slate-800 dark:text-slate-200 font-mono">${stock.price.toFixed(2)}</div>
                   <div className={`text-[10px] flex items-center justify-end gap-1 font-medium ${stock.change >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
                     {stock.change >= 0 ? '+' : ''}{Math.abs(stock.changePercent).toFixed(2)}%
@@ -149,6 +206,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[10px] font-bold py-2 rounded-lg transition-colors relative z-10">
               View Plans
             </button>
+          </div>
+        </div>
+
+        {/* ── Resize Handle ── */}
+        <div
+          onMouseDown={onMouseDown}
+          className={`sidebar-resize-handle ${isResizing ? 'sidebar-resize-handle--active' : ''}`}
+          title="Drag to resize sidebar"
+          aria-label="Resize sidebar"
+        >
+          {/* subtle grip dots */}
+          <div className="sidebar-resize-grip">
+            <GripVertical size={12} className="text-slate-400 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
       </div>

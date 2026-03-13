@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Menu, Layers } from 'lucide-react';
 import Sidebar from './components/Layout/Sidebar';
 import MarketOverview from './components/Market/MarketOverview';
@@ -15,6 +15,11 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+
+  const handleSidebarWidthChange = useCallback((w: number) => {
+    setSidebarWidth(w);
+  }, []);
   
   // Theme State
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -112,9 +117,13 @@ const App: React.FC = () => {
         onClose={() => setIsMobileMenuOpen(false)}
         isDarkMode={theme === 'dark'}
         toggleTheme={toggleTheme}
+        onWidthChange={handleSidebarWidthChange}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div
+        className="flex-1 flex flex-col min-w-0 relative"
+        style={{ transition: 'margin-left 0.05s linear' }}
+      >
         {/* Mobile Header */}
         <header className="lg:hidden flex items-center justify-between p-4 border-b border-border bg-surface sticky top-0 z-30 transition-colors duration-300">
            <div className="flex items-center gap-2">
