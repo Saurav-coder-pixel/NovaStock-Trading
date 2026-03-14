@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, GripVertical, Globe } from 'lucide-react';
+import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, GripVertical, Globe, Bitcoin } from 'lucide-react';
 import { Stock, ViewType } from '../../types';
 import UpgradePlanModal from './UpgradePlanModal';
 
@@ -43,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'worldmonitor', label: 'World Monitor', icon: Globe },
     { id: 'market', label: 'Stock Market', icon: LineChart },
+    { id: 'cryptotrading', label: 'Crypto Trading', icon: Bitcoin },
     { id: 'portfolio', label: 'Portfolio', icon: PieChart },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
