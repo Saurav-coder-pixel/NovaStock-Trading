@@ -8,7 +8,7 @@ import TerminalLayout from '../Layout/TerminalLayout';
 import TickerTape, { TickerItem } from '../Terminal/TickerTape';
 import AssetList, { AssetItem } from '../Terminal/AssetList';
 import LightweightChart from '../Terminal/LightweightChart';
-import PerformanceChart from '../Terminal/PerformanceChart';
+import StockLinearChart from '../Terminal/StockLinearChart';
 import OrderBook, { OrderLevel } from '../Terminal/OrderBook';
 import OrderPanel from '../Terminal/OrderPanel';
 import AIPanel from '../Terminal/AIPanel';
@@ -86,80 +86,7 @@ const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isDarkMod
      };
   });
 
-  const [performanceData, setPerformanceData] = useState<any[]>([]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadSession = async () => {
-       try {
-         const [aapl, nvda, tsla] = await Promise.all([
-           fetchStockHistory('AAPL', '1H'),
-           fetchStockHistory('NVDA', '1H'),
-           fetchStockHistory('TSLA', '1H')
-         ]);
-         if (!mounted) return;
-         
-         const merged: any[] = [];
-         const limit = 24;
-         const aSlice = aapl.slice(-limit);
-         const nSlice = nvda.slice(-limit);
-         const tSlice = tsla.slice(-limit);
-
-         if (aSlice.length > 0) {
-            const baseA = aSlice[0].close;
-            const baseN = nSlice[0]?.close || baseA;
-            const baseT = tSlice[0]?.close || baseA;
-
-            for (let i = 0; i < aSlice.length; i++) {
-               merged.push({
-                 time: aSlice[i].time,
-                 'AAPL': ((aSlice[i].close - baseA) / baseA) * 100,
-                 'NVDA': nSlice[i] ? ((nSlice[i].close - baseN) / baseN) * 100 : 0,
-                 'TSLA': tSlice[i] ? ((tSlice[i].close - baseT) / baseT) * 100 : 0,
-                 _baseA: baseA,
-                 _baseN: baseN,
-                 _baseT: baseT
-               });
-            }
-         }
-         setPerformanceData(merged);
-       } catch (error) {
-          console.error("Failed to load perf history");
-       }
-    };
-    loadSession();
-
-    const interval = setInterval(() => {
-       setPerformanceData(prev => {
-          if (prev.length === 0) return prev;
-          
-          const currentA = WATCHLIST.find(c => c.symbol === 'AAPL')?.price;
-          const currentN = WATCHLIST.find(c => c.symbol === 'NVDA')?.price;
-          const currentT = WATCHLIST.find(c => c.symbol === 'TSLA')?.price;
-          
-          if (!currentA || !currentN || !currentT) return prev;
-          
-          const lastPoint = prev[prev.length - 1];
-          
-          const newPoint = {
-             time: new Date().toISOString(),
-             'AAPL': ((currentA - lastPoint._baseA) / lastPoint._baseA) * 100,
-             'NVDA': ((currentN - lastPoint._baseN) / lastPoint._baseN) * 100,
-             'TSLA': ((currentT - lastPoint._baseT) / lastPoint._baseT) * 100,
-             _baseA: lastPoint._baseA,
-             _baseN: lastPoint._baseN,
-             _baseT: lastPoint._baseT
-          };
-          
-          return [...prev, newPoint];
-       });
-    }, 15000);
-
-    return () => {
-       mounted = false;
-       clearInterval(interval);
-    };
-  }, []);
 
   const handleGenerateAI = async () => {
      if (history.length === 0) return;
@@ -214,7 +141,7 @@ const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isDarkMod
              <ArrowUpRight className="text-primary w-5 h-5" />
              <span className="font-bold text-slate-100 uppercase tracking-widest text-sm">Alta MI</span>
              <span className="text-slate-500 mx-2">|</span>
-             <span className="font-mono text-xs text-slate-400">Equities & Options Desk</span>
+             <span className="font-mono text-slate-400" style={{ fontSize: '16px' }}>Equities & Options Desk</span>
           </div>
         }
         leftPanel={
@@ -231,12 +158,11 @@ const MarketOverview: React.FC<MarketOverviewProps> = ({ currentStock, isDarkMod
         }
         mainChart={
           <>
-            <div className="h-[200px] shrink-0">
-               <PerformanceChart 
-                 data={performanceData} 
-                 assets={[currentStock.symbol, 'SPY', 'QQQ']} 
-                 colors={['#0ea5e9', '#ec4899', '#f59e0b']} 
-               />
+            <div className="h-[200px] w-full overflow-hidden shrink-0">
+             <StockLinearChart
+               selectedStock={currentStock}
+               availableStocks={WATCHLIST}
+             />
             </div>
             <div className="flex-1 min-h-0 bg-[#0A0B0E] flex flex-col border-t border-[#1E293B]">
                <div className="flex bg-[#0A0B0E] p-2 gap-2 border-b border-[#1E293B] items-center">
