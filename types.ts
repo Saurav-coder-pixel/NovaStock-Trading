@@ -1,4 +1,13 @@
 
+export type AIProvider = 'gemini' | 'openai' | 'anthropic';
+
+export interface AIProviderConfig {
+  provider: AIProvider;
+  apiKey: string;
+  model: string;
+  isCustom: boolean;
+}
+
 export interface Stock {
   symbol: string;
   name: string;
@@ -51,7 +60,7 @@ export interface PredictionResult {
   predictedPath?: number[];
 }
 
-export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings' | 'worldmonitor' | 'cryptotrading';
+export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings' | 'worldmonitor' | 'cryptotrading' | 'novaai';
 
 export interface Holding {
   symbol: string;

@@ -7,6 +7,7 @@ import Portfolio from './components/Portfolio/Portfolio';
 import Settings from './components/Settings/Settings';
 import WorldMonitor from './components/WorldMonitor/WorldMonitor';
 import CryptoTradingOverview from './components/CryptoTrading/CryptoTradingOverview';
+import NovaAIChat from './components/NovaAI/NovaAIChat';
 import { WATCHLIST, subscribeToTicker } from './services/stockService';
 import { Stock, ViewType } from './types';
 
@@ -88,6 +89,8 @@ const App: React.FC = () => {
         return <WorldMonitor isDarkMode={theme === 'dark'} />;
       case 'cryptotrading':
         return <CryptoTradingOverview isDarkMode={theme === 'dark'} />;
+      case 'novaai':
+        return <NovaAIChat watchlist={watchlist} />;
       case 'settings':
         return <Settings />;
       default:
