@@ -6,6 +6,7 @@ import DashboardHome from './components/Dashboard/DashboardHome';
 import Portfolio from './components/Portfolio/Portfolio';
 import Settings from './components/Settings/Settings';
 import WorldMonitor from './components/WorldMonitor/WorldMonitor';
+import CryptoTradingOverview from './components/CryptoTrading/CryptoTradingOverview';
 import { WATCHLIST, subscribeToTicker } from './services/stockService';
 import { Stock, ViewType } from './types';
 
@@ -85,6 +86,8 @@ const App: React.FC = () => {
         return <Portfolio watchlist={watchlist} />;
       case 'worldmonitor':
         return <WorldMonitor isDarkMode={theme === 'dark'} />;
+      case 'cryptotrading':
+        return <CryptoTradingOverview isDarkMode={theme === 'dark'} />;
       case 'settings':
         return <Settings />;
       default:
