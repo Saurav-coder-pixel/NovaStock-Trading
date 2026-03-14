@@ -1,7 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { LayoutDashboard, LineChart, PieChart, Settings, Layers, X, Moon, Sun, GripVertical } from 'lucide-react';
 import { Stock, ViewType } from '../../types';
 import UpgradePlanModal from './UpgradePlanModal';
+
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 420;
+const DEFAULT_WIDTH = 256; // w-64 = 16rem = 256px
 
 interface SidebarProps {
   watchlist: Stock[];
@@ -13,11 +17,8 @@ interface SidebarProps {
   onClose?: () => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  onWidthChange?: (width: number) => void;
 }
-
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 420;
-const DEFAULT_WIDTH = 256;
 
 const Sidebar: React.FC<SidebarProps> = ({
   watchlist,
@@ -29,40 +30,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   isDarkMode,
   toggleTheme,
+  onWidthChange,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(DEFAULT_WIDTH);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef<number>(0);
+  const startWidthRef = useRef<number>(DEFAULT_WIDTH);
 
-  // ── Resize handle logic ──────────────────────────────────────────────────────
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = sidebarWidth;
-    setIsResizing(true);
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientX - resizeStartX.current;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, resizeStartWidth.current + delta));
-      setSidebarWidth(newWidth);
-    };
-
-    const onMouseUp = () => {
-      setIsResizing(false);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [sidebarWidth]);
-
-  // Double-click resize handle → snap back to default
-  const resetWidth = () => setSidebarWidth(DEFAULT_WIDTH);
-
-  // ── Nav ──────────────────────────────────────────────────────────────────────
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'market', label: 'Stock Market', icon: LineChart },
@@ -81,27 +57,84 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (onClose) onClose();
   };
 
+  // ── Resize Logic ──────────────────────────────────────────────────
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      startXRef.current = e.clientX;
+      startWidthRef.current = sidebarWidth;
+      setIsResizing(true);
+    },
+    [sidebarWidth]
+  );
+
+  const onMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const delta = e.clientX - startXRef.current;
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
+      setSidebarWidth(newWidth);
+      onWidthChange?.(newWidth);
+    },
+    [isResizing, onWidthChange]
+  );
+
+  const onMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Double-click resize handle → snap back to default
+  const resetWidth = () => {
+    setSidebarWidth(DEFAULT_WIDTH);
+    onWidthChange?.(DEFAULT_WIDTH);
+  };
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    } else {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing, onMouseMove, onMouseUp]);
+
+  // Notify parent of default width on mount
+  useEffect(() => {
+    onWidthChange?.(DEFAULT_WIDTH);
+  }, []);
+  // ──────────────────────────────────────────────────────────────────
+
   return (
     <>
       <div
-        style={{ width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, position: 'relative' }}
-        className={`fixed inset-y-0 left-0 z-50 bg-surface border-r border-border flex flex-col h-full shadow-2xl transition-[width] duration-75 lg:relative lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        ref={sidebarRef}
+        style={{ width: sidebarWidth, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH, position: 'relative' }}
+        className={`fixed inset-y-0 left-0 z-50 bg-surface border-r border-border flex flex-col h-full shadow-2xl lg:relative lg:translate-x-0 ${
+          isResizing ? '' : 'transition-[width] duration-75'
+        } ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Brand */}
         <div className="p-6 pb-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 flex-shrink-0 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Layers className="text-white w-5 h-5" />
             </div>
             {sidebarWidth > 210 && (
-              <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">NovaTrade</span>
+              <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white truncate">
+                NovaTrade
+              </span>
             )}
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-1"
+            className="lg:hidden flex-shrink-0 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-1"
           >
             <X size={20} />
           </button>
@@ -110,7 +143,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
           {/* Main Nav */}
           {sidebarWidth > 210 && (
-            <div className="px-6 mb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Platform</div>
+            <div className="px-6 mb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              Platform
+            </div>
           )}
           <nav className="space-y-1 px-3 mb-8">
             {navItems.map((item) => (
@@ -128,13 +163,15 @@ const Sidebar: React.FC<SidebarProps> = ({
               >
                 <item.icon
                   size={18}
-                  className={
+                  className={`flex-shrink-0 ${
                     currentView === item.id
-                      ? 'text-indigo-600 dark:text-indigo-400 shrink-0'
-                      : 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors shrink-0'
-                  }
+                      ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors'
+                  }`}
                 />
-                {sidebarWidth > 210 && <span className="text-sm font-medium truncate">{item.label}</span>}
+                {sidebarWidth > 210 && (
+                  <span className="text-sm font-medium truncate">{item.label}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -175,17 +212,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                           {stock.symbol}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate" style={{ maxWidth: sidebarWidth - 110 }}>
+                      <div
+                        className="text-[11px] text-slate-500 truncate"
+                        style={{ maxWidth: sidebarWidth - 110 }}
+                      >
                         {stock.name}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right flex-shrink-0">
                       <div className="text-sm font-medium text-slate-800 dark:text-slate-200 font-mono">
                         ${stock.price.toFixed(2)}
                       </div>
                       <div
                         className={`text-[10px] flex items-center justify-end gap-1 font-medium ${
-                          stock.change >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
+                          stock.change >= 0
+                            ? 'text-emerald-500 dark:text-emerald-400'
+                            : 'text-rose-500 dark:text-rose-400'
                         }`}
                       >
                         {stock.change >= 0 ? '+' : ''}
@@ -209,7 +251,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
               <span className="text-xs font-medium">Appearance</span>
               <div className="flex items-center gap-2">
-                {isDarkMode ? <Moon size={14} className="text-indigo-400" /> : <Sun size={14} className="text-amber-500" />}
+                {isDarkMode ? (
+                  <Moon size={14} className="text-indigo-400" />
+                ) : (
+                  <Sun size={14} className="text-amber-500" />
+                )}
                 <span className="text-xs">{isDarkMode ? 'Dark' : 'Light'}</span>
               </div>
             </button>
@@ -221,7 +267,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="absolute top-0 right-0 -mt-2 -mr-2 w-16 h-16 bg-white opacity-10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
               <p className="text-xs text-white font-bold mb-0.5 relative z-10">Upgrade to Pro</p>
-              <p className="text-[10px] text-indigo-100 mb-3 relative z-10 opacity-80">Unlock unlimited AI predictions.</p>
+              <p className="text-[10px] text-indigo-100 mb-3 relative z-10 opacity-80">
+                Unlock unlimited AI predictions.
+              </p>
               <button
                 className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[10px] font-bold py-2 rounded-lg transition-colors relative z-10"
                 onClick={(e) => {
@@ -237,7 +285,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* ── Right-edge Resize Handle ─────────────────────────────────────────── */}
         <div
-          onMouseDown={startResize}
+          onMouseDown={onMouseDown}
           onDoubleClick={resetWidth}
           title="Drag to resize · Double-click to reset"
           className="absolute top-0 right-0 h-full flex items-center group"
@@ -252,13 +300,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               marginLeft: 'auto',
             }}
           />
-          {/* Center grip dots */}
-          <div
-            className="absolute top-1/2 -translate-y-1/2 right-0.5 flex flex-col gap-[3px] opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="w-1 h-1 rounded-full bg-indigo-400" />
-            ))}
+          {/* Center grip icon */}
+          <div className="absolute top-1/2 -translate-y-1/2 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical size={12} className="text-slate-400 dark:text-slate-600" />
           </div>
         </div>
       </div>
