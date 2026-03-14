@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Candle, Stock } from "../types";
 
-const API_KEY = process.env.API_KEY || ''; 
+const API_KEY = process.env.API_KEY || 'AIzaSyBfnu0HJcFaafrZNIrUgtPQftpBD4xLpjA'; 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const SYSTEM_INSTRUCTION = `
