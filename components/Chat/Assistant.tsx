@@ -21,9 +21,9 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>({
-    provider: 'gemini',
-    apiKey: '',
-    model: 'gemini-2.0-flash-exp',
+    provider: 'groq',
+    apiKey: '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',
+    model: 'llama-3.3-70b-versatile',
     isCustom: false
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -126,7 +126,7 @@ const Assistant: React.FC<AssistantProps> = ({ currentStock, isOpen, onClose }) 
           </div>
           <div>
             <h2 className="text-sm font-bold text-white">
-              Nova AI · {aiConfig.provider === 'gemini' ? 'Gemini' : aiConfig.provider === 'openai' ? 'GPT' : 'Claude'}
+              Nova AI · {aiConfig.provider === 'gemini' ? 'Gemini' : aiConfig.provider === 'openai' ? 'GPT-4o' : aiConfig.provider === 'groq' ? '⚡ Groq' : 'Claude'}
             </h2>
             <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
