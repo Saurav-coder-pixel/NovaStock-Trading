@@ -38,11 +38,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const startWidthRef = useRef<number>(DEFAULT_WIDTH);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'market', label: 'Stock Market', icon: LineChart },
-    { id: 'crypto', label: 'Crypto Exchange', icon: Bitcoin },
-    { id: 'portfolio', label: 'Portfolio', icon: PieChart },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard',      icon: LayoutDashboard },
+    { id: 'market',    label: 'Stock Market',    icon: LineChart       },
+    { id: 'crypto',    label: 'Crypto Exchange', icon: Bitcoin         },
+    { id: 'portfolio', label: 'Portfolio',       icon: PieChart        },
+    { id: 'settings',  label: 'Settings',        icon: Settings        },
   ];
 
   const handleNavigation = (view: ViewType) => {
