@@ -51,7 +51,7 @@ export interface PredictionResult {
   predictedPath?: number[];
 }
 
-export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings';
+export type ViewType = 'dashboard' | 'market' | 'portfolio' | 'settings' | 'worldmonitor';
 
 export interface Holding {
   symbol: string;
